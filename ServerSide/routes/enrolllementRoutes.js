@@ -5,7 +5,7 @@ const { enrollCourse, getEnrolledCourses, checkEnrollment, markLessonCompleted }
 
 router.post("/enrollments", enrollCourse);
 router.post("/enrollments/mark-lesson-completed", markLessonCompleted);
-router.get("/enrollments/:studentId", getEnrolledCourses);
 router.get("/enrollments/:studentId/:courseId", checkEnrollment);
+router.get("/enrollments/:studentId", getEnrolledCourses);
 
 module.exports = router;

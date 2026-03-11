@@ -31,6 +31,17 @@ const StudentDashboard = () => {
     fetchEnrolledCourses();
   }, [user?._id]);
 
+  // Auto-refresh enrollment data every 5 seconds to catch progress updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (user?._id) {
+        fetchEnrolledCourses();
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [user?._id]);
+
   const completedCourses = enrolledCourses.filter(
     (enrollment) => enrollment.progress === 100
   ).length;

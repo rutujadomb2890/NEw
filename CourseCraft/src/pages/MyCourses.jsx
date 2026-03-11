@@ -57,9 +57,18 @@ const MyCourses = () => {
     };
     
     document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Auto-refresh enrollment data every 5 seconds to catch progress updates
+    const interval = setInterval(() => {
+      if (user?._id) {
+        console.log("Auto-refreshing course data...");
+        fetchEnrolledCourses();
+      }
+    }, 5000);
     
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
     };
   }, [user?._id]);
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import { getLessonsByCourse, markLessonCompleted } from "../api/courseApi";
+import { getLessonsByCourse, markLessonCompleted, getEnrolledCourses } from "../api/courseApi";
 
 const CoursePlayer = () => {
   const { courseId } = useParams();
@@ -11,6 +11,7 @@ const CoursePlayer = () => {
   const [completedLessons, setCompletedLessons] = useState([]);
   const [courseProgress, setCourseProgress] = useState(0);
   const [studentId, setStudentId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Get student ID from localStorage
   useEffect(() => {
@@ -20,24 +21,49 @@ const CoursePlayer = () => {
     }
   }, []);
 
-  // Fetch lessons from backend
+  // Fetch lessons and enrollment progress from backend
   useEffect(() => {
-    const fetchLessons = async () => {
+    const fetchLessonsAndProgress = async () => {
       try {
+        setLoading(true);
         const res = await getLessonsByCourse(courseId);
-
         setLessons(res.data);
 
         if (res.data.length > 0) {
           setCurrentLesson(res.data[0]);
         }
+
+        // Fetch enrollment to get completed lessons and progress
+        if (studentId) {
+          try {
+            const enrollmentRes = await getEnrolledCourses(studentId);
+            const enrollments = enrollmentRes.data.enrollments || [];
+            const courseEnrollment = enrollments.find(
+              (e) => e.course?._id === courseId
+            );
+
+            if (courseEnrollment) {
+              setCompletedLessons(courseEnrollment.completedLessons || []);
+              setCourseProgress(courseEnrollment.progress || 0);
+              console.log(
+                `Loaded progress: ${courseEnrollment.progress}%, Completed lessons: ${courseEnrollment.completedLessons?.length || 0}`
+              );
+            }
+          } catch (err) {
+            console.error("Error fetching enrollment:", err);
+          }
+        }
       } catch (error) {
         console.error("Error fetching lessons:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchLessons();
-  }, [courseId]);
+    if (studentId) {
+      fetchLessonsAndProgress();
+    }
+  }, [courseId, studentId]);
 
   const handleTimeUpdate = async (e) => {
     const video = e.target;
@@ -46,25 +72,33 @@ const CoursePlayer = () => {
     if (
       progress >= 80 &&
       currentLesson &&
-      !completedLessons.includes(currentLesson._id)
+      !completedLessons.includes(currentLesson._id) &&
+      studentId
     ) {
-      // Add to local state
-      setCompletedLessons([...completedLessons, currentLesson._id]);
+      try {
+        const response = await markLessonCompleted(studentId, courseId, currentLesson._id);
+        
+        // Update local state with response from backend
+        setCompletedLessons(response.data.enrollment.completedLessons || []);
+        setCourseProgress(response.data.progress);
 
-      // Call API to mark lesson as completed and update progress
-      if (studentId) {
-        try {
-          const response = await markLessonCompleted(studentId, courseId, currentLesson._id);
-          const newProgress = response.data.progress;
-          setCourseProgress(newProgress);
-
-          console.log(`Lesson marked as completed. Course progress: ${newProgress}%`);
-        } catch (error) {
-          console.error("Error marking lesson as completed:", error);
-        }
+        console.log(`Lesson marked as completed. Course progress: ${response.data.progress}%`);
+      } catch (error) {
+        console.error("Error marking lesson as completed:", error);
       }
     }
   };
+
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <div className="p-10 text-center">
+          <p>Loading course content...</p>
+        </div>
+      </>
+    );
+  }
 
   if (!currentLesson) {
     return (
